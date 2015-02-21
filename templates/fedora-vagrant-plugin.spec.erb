@@ -1,0 +1,122 @@
+# Generated from <%= package.spec.file_name %> by gem2rpm -*- rpm-spec -*-
+%global vagrant_plugin_name <%= spec.name %>
+
+Name: rubygem-%{vagrant_plugin_name}
+Version: <%= spec.version %>
+Release: 1%{?dist}
+Summary: <%= spec.summary.gsub(/\.$/, "") %>
+Group: Development/Languages
+License: <%= spec.licenses.join(" and ") %>
+<% if spec.homepage -%>
+URL: <%= spec.homepage %>
+<% end -%>
+Source0: <%= download_path %>%{vagrant_plugin_name}-%{version}.gem
+BuildRequires: ruby(release)
+BuildRequires: vagrant
+<% for req in spec.required_rubygems_version -%>
+BuildRequires: rubygems-devel <%= req %>
+<% end -%>
+<% for req in spec.required_ruby_version -%>
+BuildRequires: ruby<%= "-devel" unless spec.extensions.empty? %> <%= req %>
+<% end -%>
+<% for d in spec.development_dependencies -%>
+<% unless ["rdoc", "rake", "bundler"].include? d.name -%>
+<% for req in d.requirement -%>
+# BuildRequires: rubygem(<%= d.name %>) <%= req  %>
+<% end -%>
+<% end -%>
+<% end -%>
+<% if spec.extensions.empty? -%>
+BuildArch: noarch
+<% end -%>
+
+%description
+<%= spec.description %>
+
+<% if doc_subpackage -%>
+%package doc
+Summary: Documentation for %{name}
+Group: Documentation
+Requires: %{name} = %{version}-%{release}
+BuildArch: noarch
+
+%description doc
+Documentation for %{name}.
+<% end # if doc_subpackage -%>
+
+%prep
+gem unpack %{SOURCE0}
+
+%setup -q -D -T -n  %{vagrant_plugin_name}-%{version}
+
+gem spec %{SOURCE0} -l --ruby > %{vagrant_plugin_name}.gemspec
+
+%build
+# Create the gem as gem install only works on a gem file
+gem build %{vagrant_plugin_name}.gemspec
+
+%vagrant_plugin_install
+
+%install
+mkdir -p %{buildroot}%{vagrant_plugin_dir}
+cp -a .%{vagrant_plugin_dir}/* \
+        %{buildroot}%{vagrant_plugin_dir}/
+
+<% unless spec.extensions.empty? -%>
+mkdir -p %{buildroot}%{gem_extdir_mri}
+cp -a .%{gem_extdir_mri}/{gem.build_complete,*.so} %{buildroot}%{gem_extdir_mri}/
+
+<% for ext in spec.extensions -%>
+# Prevent dangling symlink in -debuginfo (rhbz#878863).
+rm -rf %{buildroot}%{vagrant_plugin_libdir}/<%= ext.split(File::SEPARATOR).first %>/
+<% end -%>
+<% end -%>
+
+<% unless spec.executables.nil? or spec.executables.empty? -%>
+mkdir -p %{buildroot}%{_bindir}
+cp -pa .%{_bindir}/* \
+        %{buildroot}%{_bindir}/
+<% end -%>
+
+<% unless spec.executables.empty? -%>
+find %{buildroot}%{vagrant_plugin_libdir}/bin -type f | xargs chmod a+x
+<% end -%>
+
+# Run the test suite
+%check
+pushd .%{vagrant_plugin_libdir}
+
+popd
+
+%files
+%dir %{vagrant_plugin_libdir}
+<% unless spec.executables.nil? or spec.executables.empty? -%>
+<% for f in spec.executables -%>
+%{_bindir}/<%= f %>
+<% end -%>
+%{vagrant_plugin_libdir}/bin
+<% end -%>
+%{vagrant_plugin_libdir}
+<% unless spec.extensions.empty? -%>
+%{gem_extdir_mri}
+<% end -%>
+<% unless doc_subpackage -%>
+%doc %{vagrant_plugin_docdir}
+<% for f in spec.extra_rdoc_files -%>
+%doc %{vagrant_plugin_instdir}/<%= f %>
+<% end -%>
+<% end -%>
+%exclude %{vagrant_plugin_cache}
+%{vagnrat_plugin_spec}
+
+<% if doc_subpackage -%>
+%files doc
+%doc %{vagrant_plugin_docdir}
+<% for f in spec.extra_rdoc_files -%>
+%doc %{vagrant_plugin_instdir}/<%= f %>
+<% end -%>
+<% end # if doc_subpackage -%>
+
+%changelog
+* <%= Time.now.strftime("%a %b %d %Y") %> <%= packager %> - <%= spec.version %>-1
+- Initial package
